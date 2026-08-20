@@ -1,5 +1,27 @@
 import { gql } from '@apollo/client'
 
+const RUN_FIELDS = `
+  id
+  recipeId
+  inputText
+  outputText
+  createdAt
+  traceJson
+  steps {
+    iteration
+    stopReason
+    assistantText
+    note
+    toolCalls {
+      id
+      name
+      argumentsJson
+      resultSummary
+      resultRaw
+    }
+  }
+`
+
 export const RECIPES_QUERY = gql`
   query Recipes {
     recipes {
@@ -15,23 +37,15 @@ export const RECIPES_QUERY = gql`
 export const AGENT_RUNS_QUERY = gql`
   query AgentRuns($limit: Int = 20) {
     agentRuns(limit: $limit) {
-      id
-      recipeId
-      inputText
-      outputText
-      createdAt
-      steps {
-        iteration
-        stopReason
-        assistantText
-        note
-        toolCalls {
-          id
-          name
-          argumentsJson
-          resultSummary
-        }
-      }
+      ${RUN_FIELDS}
+    }
+  }
+`
+
+export const AGENT_RUN_QUERY = gql`
+  query AgentRun($id: Int!) {
+    agentRun(id: $id) {
+      ${RUN_FIELDS}
     }
   }
 `
@@ -54,23 +68,7 @@ export const EVAL_SCORES_QUERY = gql`
 export const RUN_AGENT_MUTATION = gql`
   mutation RunAgent($recipeId: String!, $inputText: String!) {
     runAgent(recipeId: $recipeId, inputText: $inputText) {
-      id
-      recipeId
-      inputText
-      outputText
-      createdAt
-      steps {
-        iteration
-        stopReason
-        assistantText
-        note
-        toolCalls {
-          id
-          name
-          argumentsJson
-          resultSummary
-        }
-      }
+      ${RUN_FIELDS}
     }
   }
 `
@@ -84,5 +82,11 @@ export const CORRECT_RUN_MUTATION = gql`
       expectedAnswer
       source
     }
+  }
+`
+
+export const DELETE_AGENT_RUN_MUTATION = gql`
+  mutation DeleteAgentRun($id: Int!) {
+    deleteAgentRun(id: $id)
   }
 `

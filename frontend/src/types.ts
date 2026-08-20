@@ -3,6 +3,7 @@ export type ToolCall = {
   name: string
   argumentsJson: string
   resultSummary: string
+  resultRaw?: string
 }
 
 export type TraceStep = {
@@ -20,6 +21,7 @@ export type AgentRun = {
   outputText: string
   createdAt: string
   steps: TraceStep[]
+  traceJson?: string
 }
 
 export type Recipe = {
@@ -39,4 +41,21 @@ export type EvalScore = {
   metricBreakdown: string
   createdAt: string
   recipeId?: string | null
+}
+
+export type LiveProgressEvent = {
+  type: string
+  message?: string
+  iteration?: number
+  tool?: string
+  arguments?: unknown
+  result_raw?: string
+  text?: string
+  error?: string
+  run_id?: number
+  output_text?: string
+  trace_json?: string
+  recipe_id?: string
+  input_text?: string
+  created_at?: string
 }

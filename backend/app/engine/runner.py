@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Iterator
 from datetime import datetime, timezone
 from typing import Any
 
@@ -14,6 +15,8 @@ from app.llm.bedrock_lambda import TextBlock, ToolUseBlock
 from app.retrieval import get_retrieval_backend
 from app.tools import build_tool_registry
 
+ProgressCallback = Callable[[dict[str, Any]], None]
+
 
 def _summarize_tool_result(raw: str, limit: int = 500) -> str:
     raw = raw.strip()
@@ -22,12 +25,18 @@ def _summarize_tool_result(raw: str, limit: int = 500) -> str:
     return raw[:limit] + f"... [truncated {len(raw) - limit} chars]"
 
 
+def _emit(on_event: ProgressCallback | None, event: dict[str, Any]) -> None:
+    if on_event:
+        on_event(event)
+
+
 def run_agent(
     session: Session,
     recipe_id: str,
     input_text: str,
     *,
     persist: bool = True,
+    on_event: ProgressCallback | None = None,
 ) -> AgentRun:
     """Execute a recipe via Claude tool-use through the Bedrock Lambda URL."""
     settings = get_settings()
@@ -50,7 +59,6 @@ def run_agent(
     ]
 
     client = get_llm_client()
-    # Empty model → Lambda uses its BEDROCK_MODEL_ID; recipes may still set a Bedrock id.
     model = recipe.get("model") or settings.bedrock_model_id or None
     system = (
         f"{recipe['system_prompt']}\n\n"
@@ -70,10 +78,28 @@ def run_agent(
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
 
+    _emit(
+        on_event,
+        {
+            "type": "run_started",
+            "recipe_id": recipe_id,
+            "message": f"Starting recipe `{recipe_id}`…",
+        },
+    )
+
     final_text = ""
     max_iters = settings.max_tool_iterations
 
     for iteration in range(max_iters):
+        _emit(
+            on_event,
+            {
+                "type": "status",
+                "iteration": iteration + 1,
+                "message": f"Step {iteration + 1}: calling Claude (tool-use loop)…",
+            },
+        )
+
         response = client.messages_create(
             model=model,
             max_tokens=4096,
@@ -94,15 +120,45 @@ def run_agent(
             "tool_calls": [],
         }
 
+        if text_blocks:
+            _emit(
+                on_event,
+                {
+                    "type": "assistant_text",
+                    "iteration": iteration + 1,
+                    "text": "\n".join(text_blocks),
+                },
+            )
+
         if not tool_uses or response.stop_reason == "end_turn":
             final_text = "\n".join(text_blocks).strip()
             trace["steps"].append(step)
+            _emit(
+                on_event,
+                {
+                    "type": "step_complete",
+                    "iteration": iteration + 1,
+                    "stop_reason": response.stop_reason,
+                    "message": "Claude finished (end_turn) — synthesizing final answer.",
+                },
+            )
             break
 
         tool_results = []
         for tu in tool_uses:
             name = tu.name
             args = tu.input if isinstance(tu.input, dict) else {}
+            _emit(
+                on_event,
+                {
+                    "type": "tool_start",
+                    "iteration": iteration + 1,
+                    "tool": name,
+                    "arguments": args,
+                    "message": f"Running tool `{name}`…",
+                },
+            )
+
             handler = tools[name]["handler"]
             try:
                 raw_result = handler(**args)
@@ -127,10 +183,38 @@ def run_agent(
                     "content": raw_result,
                 }
             )
+            _emit(
+                on_event,
+                {
+                    "type": "tool_end",
+                    "iteration": iteration + 1,
+                    "tool": name,
+                    "arguments": args,
+                    "result_raw": raw_result,
+                    "message": f"Finished tool `{name}`.",
+                },
+            )
 
         trace["steps"].append(step)
+        _emit(
+            on_event,
+            {
+                "type": "step_complete",
+                "iteration": iteration + 1,
+                "stop_reason": response.stop_reason,
+                "tool_count": len(tool_uses),
+                "message": f"Step {iteration + 1} complete ({len(tool_uses)} tool call(s)).",
+            },
+        )
         messages.append({"role": "user", "content": tool_results})
     else:
+        _emit(
+            on_event,
+            {
+                "type": "status",
+                "message": "Tool-call limit reached — forcing final synthesis…",
+            },
+        )
         response = client.messages_create(
             model=model,
             max_tokens=4096,
@@ -165,4 +249,33 @@ def run_agent(
         session.add(run)
         session.commit()
         session.refresh(run)
+
+    _emit(
+        on_event,
+        {
+            "type": "run_complete",
+            "run_id": run.id,
+            "output_text": final_text,
+            "trace_json": run.trace_json,
+            "recipe_id": run.recipe_id,
+            "input_text": run.input_text,
+            "created_at": (run.created_at or datetime.now(timezone.utc)).isoformat(),
+            "message": f"Run #{run.id} complete.",
+        },
+    )
     return run
+
+
+def iter_run_events(
+    session: Session,
+    recipe_id: str,
+    input_text: str,
+) -> Iterator[dict[str, Any]]:
+    """Yield progress events then a final run_complete (used by SSE)."""
+    queue: list[dict[str, Any]] = []
+
+    def on_event(event: dict[str, Any]) -> None:
+        queue.append(event)
+
+    run_agent(session, recipe_id, input_text, persist=True, on_event=on_event)
+    yield from queue

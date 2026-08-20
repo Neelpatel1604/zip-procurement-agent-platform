@@ -5,9 +5,8 @@ from datetime import datetime
 from typing import Optional
 
 import strawberry
-from strawberry.types import Info
 
-from app.db.models import AgentRun, EvalScore, Recipe
+from app.db.models import AgentRun, EvalScore
 from app.db.session import SessionLocal
 from app.engine import list_recipes, run_agent
 from app.eval import correct_run
@@ -28,6 +27,7 @@ class ToolCallType:
     name: str
     arguments_json: str
     result_summary: str
+    result_raw: str
 
 
 @strawberry.type
@@ -82,8 +82,9 @@ def _parse_steps(trace_json: str) -> list[TraceStepType]:
             ToolCallType(
                 id=str(tc.get("id", "")),
                 name=str(tc.get("name", "")),
-                arguments_json=json.dumps(tc.get("arguments", {})),
+                arguments_json=json.dumps(tc.get("arguments", {}), indent=2),
                 result_summary=str(tc.get("result_summary", "")),
+                result_raw=str(tc.get("result_raw") or tc.get("result_summary") or ""),
             )
             for tc in step.get("tool_calls", [])
         ]
@@ -100,12 +101,18 @@ def _parse_steps(trace_json: str) -> list[TraceStepType]:
 
 
 def _to_run_type(run: AgentRun) -> AgentRunType:
+    created = run.created_at
+    if created is not None and created.tzinfo is None:
+        # Treat naive SQLite timestamps as UTC so the UI can localize correctly.
+        from datetime import timezone
+
+        created = created.replace(tzinfo=timezone.utc)
     return AgentRunType(
         id=run.id,
         recipe_id=run.recipe_id,
         input_text=run.input_text,
         output_text=run.output_text,
-        created_at=run.created_at,
+        created_at=created,
         trace_json=run.trace_json,
         steps=_parse_steps(run.trace_json),
     )
@@ -164,6 +171,11 @@ class Query:
             )
             out: list[EvalScoreType] = []
             for score, recipe_id in rows:
+                created = score.created_at
+                if created is not None and created.tzinfo is None:
+                    from datetime import timezone
+
+                    created = created.replace(tzinfo=timezone.utc)
                 out.append(
                     EvalScoreType(
                         id=score.id,
@@ -172,7 +184,7 @@ class Query:
                         score=score.score,
                         reasoning=score.reasoning,
                         metric_breakdown=score.metric_breakdown,
-                        created_at=score.created_at,
+                        created_at=created,
                         recipe_id=recipe_id,
                     )
                 )
@@ -209,6 +221,21 @@ class Mutation:
                 expected_answer=item.expected_answer,
                 source=item.source,
             )
+        finally:
+            session.close()
+
+    @strawberry.mutation
+    def delete_agent_run(self, id: int) -> bool:
+        """Delete an agent run and any eval_scores that reference it."""
+        session = SessionLocal()
+        try:
+            run = session.get(AgentRun, id)
+            if run is None:
+                return False
+            session.query(EvalScore).filter(EvalScore.run_id == id).delete()
+            session.delete(run)
+            session.commit()
+            return True
         finally:
             session.close()
 
