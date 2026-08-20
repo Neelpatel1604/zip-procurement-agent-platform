@@ -3,6 +3,8 @@ import { useMutation, useQuery } from '@apollo/client/react'
 import { RECIPES_QUERY, CORRECT_RUN_MUTATION } from '../graphql'
 import type { AgentRun, LiveProgressEvent, Recipe, TraceStep } from '../types'
 import { TraceView } from '../components/TraceView'
+import { RecipeSelect } from '../components/RecipeSelect'
+import { LiveProgress } from '../components/LiveProgress'
 
 type RecipesData = { recipes: Recipe[] }
 
@@ -47,7 +49,6 @@ export function RunPage() {
   const [running, setRunning] = useState(false)
   const [liveLog, setLiveLog] = useState<string[]>([])
   const [liveStatus, setLiveStatus] = useState<string | null>(null)
-  const [liveSteps, setLiveSteps] = useState<TraceStep[]>([])
 
   const recipes = recipesData?.recipes ?? []
   const selected = useMemo(
@@ -61,7 +62,6 @@ export function RunPage() {
     setCorrectMsg(null)
     setResult(null)
     setLiveLog([])
-    setLiveSteps([])
     setLiveStatus('Starting…')
     setRunning(true)
 
@@ -107,57 +107,6 @@ export function RunPage() {
             setLiveLog((prev) => [...prev, event.message!])
           }
 
-          if (event.type === 'tool_start' && event.tool) {
-            setLiveSteps((prev) => {
-              const iteration = event.iteration || prev.length || 1
-              const existing = prev.find((s) => s.iteration === iteration)
-              const toolCall = {
-                id: `live-${iteration}-${event.tool}-${prev.length}`,
-                name: event.tool!,
-                argumentsJson: JSON.stringify(event.arguments ?? {}, null, 2),
-                resultSummary: '(running…)',
-                resultRaw: '(running…)',
-              }
-              if (!existing) {
-                return [
-                  ...prev,
-                  {
-                    iteration,
-                    stopReason: 'tool_use',
-                    assistantText: '',
-                    toolCalls: [toolCall],
-                  },
-                ]
-              }
-              return prev.map((s) =>
-                s.iteration === iteration
-                  ? { ...s, toolCalls: [...s.toolCalls, toolCall] }
-                  : s,
-              )
-            })
-          }
-
-          if (event.type === 'tool_end' && event.tool) {
-            setLiveSteps((prev) =>
-              prev.map((s) => {
-                if (s.iteration !== (event.iteration || s.iteration)) return s
-                const toolCalls = [...s.toolCalls]
-                for (let i = toolCalls.length - 1; i >= 0; i -= 1) {
-                  if (toolCalls[i].name === event.tool && toolCalls[i].resultRaw === '(running…)') {
-                    toolCalls[i] = {
-                      ...toolCalls[i],
-                      resultSummary: String(event.result_raw || '').slice(0, 500),
-                      resultRaw: String(event.result_raw || ''),
-                      argumentsJson: JSON.stringify(event.arguments ?? {}, null, 2),
-                    }
-                    break
-                  }
-                }
-                return { ...s, toolCalls }
-              }),
-            )
-          }
-
           if (event.type === 'error') {
             throw new Error(event.error || event.message || 'Agent stream error')
           }
@@ -175,7 +124,6 @@ export function RunPage() {
             }
             setResult(run)
             setCorrected(run.outputText)
-            setLiveSteps(steps)
             setLiveStatus(event.message || `Run #${run.id} complete.`)
           }
         }
@@ -219,38 +167,29 @@ export function RunPage() {
 
       <form
         onSubmit={onSubmit}
-        className="space-y-4 rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 shadow-sm"
+        className="space-y-4 rounded-xl border border-[var(--line)] bg-[var(--panel)] p-5"
       >
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium">Recipe</span>
-          <select
-            className="w-full rounded-md border border-[var(--line)] bg-white px-3 py-2"
-            value={recipeId}
-            disabled={recipesLoading || running}
-            onChange={(e) => {
-              const id = e.target.value
-              setRecipeId(id)
-              if (EXAMPLES[id]) setInputText(EXAMPLES[id])
-            }}
-          >
-            {recipes.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name} ({r.id})
-              </option>
-            ))}
-          </select>
-        </label>
+        <RecipeSelect
+          recipes={recipes}
+          value={recipeId}
+          loading={recipesLoading}
+          disabled={running}
+          onChange={(id) => {
+            setRecipeId(id)
+            if (EXAMPLES[id]) setInputText(EXAMPLES[id])
+          }}
+        />
 
         {selected && (
           <p className="text-xs text-[var(--muted)]">
-            tools: {selected.tools.join(', ')} · model: {selected.model || 'lambda default'}
+            model: {selected.model || 'lambda default'}
           </p>
         )}
 
         <label className="block text-sm">
-          <span className="mb-1 block font-medium">Request</span>
+          <span className="mb-1.5 block font-medium">Request</span>
           <textarea
-            className="min-h-28 w-full rounded-md border border-[var(--line)] bg-white px-3 py-2"
+            className="min-h-28 w-full rounded-xl border border-[var(--line)] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/10"
             value={inputText}
             disabled={running}
             onChange={(e) => setInputText(e.target.value)}
@@ -260,65 +199,49 @@ export function RunPage() {
         <button
           type="submit"
           disabled={running || !inputText.trim()}
-          className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="cursor-pointer rounded-lg bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-45"
         >
           {running ? 'Running…' : 'Submit'}
         </button>
       </form>
 
-      {(running || liveLog.length > 0) && (
-        <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4">
-          <h2 className="mb-2 text-lg font-semibold">Live activity</h2>
-          {liveStatus && (
-            <p className="mb-3 rounded-md bg-[var(--accent-soft)] px-3 py-2 text-sm font-medium text-[var(--accent)]">
-              {running ? '● ' : '✓ '}
-              {liveStatus}
-            </p>
-          )}
-          <ol className="max-h-48 space-y-1 overflow-auto text-xs text-[var(--muted)]">
-            {liveLog.map((line, i) => (
-              <li key={`${i}-${line.slice(0, 24)}`}>{line}</li>
-            ))}
-          </ol>
-          {liveSteps.length > 0 && (
-            <div className="mt-4">
-              <h3 className="mb-2 text-sm font-semibold">Live trace</h3>
-              <TraceView steps={liveSteps} />
-            </div>
-          )}
-        </div>
-      )}
+      <LiveProgress
+        running={running}
+        status={liveStatus}
+        recipeName={selected?.name}
+        log={liveLog}
+      />
 
       {error && (
-        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
         </div>
       )}
 
-      {result && (
+      {result && !running && (
         <section className="space-y-4">
-          <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4">
-            <div className="mb-2 flex items-baseline justify-between gap-2">
-              <h2 className="text-lg font-semibold">Output</h2>
+          <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-5">
+            <div className="mb-3 flex items-baseline justify-between gap-2">
+              <h2 className="text-base font-semibold">Output</h2>
               <span className="text-xs text-[var(--muted)]">run #{result.id}</span>
             </div>
-            <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words text-sm">
+            <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words text-sm leading-relaxed">
               {result.outputText}
             </pre>
           </div>
 
-          <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4">
-            <h2 className="mb-3 text-lg font-semibold">Execution trace</h2>
+          <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-5">
+            <h2 className="mb-3 text-base font-semibold">Execution trace</h2>
             <TraceView steps={result.steps} />
           </div>
 
-          <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4">
-            <h2 className="mb-2 text-lg font-semibold">Correction loop</h2>
-            <p className="mb-2 text-sm text-[var(--muted)]">
+          <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-5">
+            <h2 className="mb-1 text-base font-semibold">Correction loop</h2>
+            <p className="mb-3 text-sm text-[var(--muted)]">
               Save a corrected output into the golden set (source=correction).
             </p>
             <textarea
-              className="mb-2 min-h-24 w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm"
+              className="mb-3 min-h-24 w-full rounded-xl border border-[var(--line)] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/10"
               value={corrected}
               onChange={(e) => setCorrected(e.target.value)}
             />
@@ -326,11 +249,11 @@ export function RunPage() {
               type="button"
               onClick={onCorrect}
               disabled={correcting || !corrected.trim()}
-              className="rounded-md border border-[var(--accent)] px-3 py-1.5 text-sm text-[var(--accent)] disabled:opacity-50"
+              className="cursor-pointer rounded-lg border border-[var(--line)] px-3.5 py-2 text-sm font-medium text-[var(--ink)] transition hover:bg-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-45"
             >
               {correcting ? 'Saving…' : 'Add to golden set'}
             </button>
-            {correctMsg && <p className="mt-2 text-sm">{correctMsg}</p>}
+            {correctMsg && <p className="mt-2 text-sm text-[var(--muted)]">{correctMsg}</p>}
           </div>
         </section>
       )}
