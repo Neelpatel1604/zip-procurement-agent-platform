@@ -1,0 +1,23 @@
+{
+  "name": "procurement-bedrock-anthropic-cdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CDK stack: Lambda Function URL streaming Anthropic Claude via Amazon Bedrock",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy --require-approval never",
+    "destroy": "cdk destroy",
+    "diff": "cdk diff"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "aws-cdk": "^2.173.0",
+    "aws-cdk-lib": "^2.173.0",
+    "constructs": "^10.4.2",
+    "typescript": "^5.7.2",
+    "ts-node": "^10.9.2"
+  }
+}

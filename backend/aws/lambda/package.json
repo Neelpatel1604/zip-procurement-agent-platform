@@ -1,0 +1,11 @@
+{
+  "name": "bedrock-anthropic-stream-lambda",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Streams Anthropic Claude via Amazon Bedrock (Lambda Function URL RESPONSE_STREAM)",
+  "main": "index.mjs",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.758.0"
+  }
+}

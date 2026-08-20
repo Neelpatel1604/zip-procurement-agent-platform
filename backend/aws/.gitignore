@@ -1,0 +1,7 @@
+node_modules/
+dist/
+cdk.out/
+*.js
+!lambda/**/*.mjs
+*.d.ts
+.cdk.staging/
