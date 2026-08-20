@@ -97,3 +97,4 @@ Streaming Anthropic-on-Bedrock via Lambda Function URL lives under
 [`backend/aws`](backend/aws). The app still uses `ANTHROPIC_API_KEY` directly;
 deploy the CDK stack when you want the Function URL ready to swap in later.
 See [`backend/aws/README.md`](backend/aws/README.md).
+
