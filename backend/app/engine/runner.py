@@ -4,12 +4,13 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-import anthropic
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db.models import AgentRun
 from app.engine.recipes import load_recipe
+from app.llm import get_llm_client
+from app.llm.bedrock_lambda import TextBlock, ToolUseBlock
 from app.retrieval import get_retrieval_backend
 from app.tools import build_tool_registry
 
@@ -28,10 +29,13 @@ def run_agent(
     *,
     persist: bool = True,
 ) -> AgentRun:
-    """Execute a recipe via Claude native tool-use. No branching on recipe name."""
+    """Execute a recipe via Claude tool-use through the Bedrock Lambda URL."""
     settings = get_settings()
-    if not settings.anthropic_api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set. Copy .env.example to .env and add your key.")
+    if not settings.bedrock_lambda_url:
+        raise RuntimeError(
+            "BEDROCK_LAMBDA_URL is not set. Copy .env.example to .env and add the "
+            "Function URL from `cdk deploy` (BedrockAnthropicFunctionUrl)."
+        )
 
     recipe = load_recipe(recipe_id)
     retrieval = get_retrieval_backend()
@@ -45,8 +49,9 @@ def run_agent(
         for t in tools.values()
     ]
 
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    model = recipe.get("model") or settings.anthropic_agent_model
+    client = get_llm_client()
+    # Empty model → Lambda uses its BEDROCK_MODEL_ID; recipes may still set a Bedrock id.
+    model = recipe.get("model") or settings.bedrock_model_id or None
     system = (
         f"{recipe['system_prompt']}\n\n"
         f"Required output format:\n{recipe['output_format']}"
@@ -58,7 +63,8 @@ def run_agent(
 
     trace: dict[str, Any] = {
         "recipe_id": recipe_id,
-        "model": model,
+        "model": model or "(lambda-default)",
+        "provider": "bedrock_lambda",
         "input": input_text,
         "steps": [],
         "started_at": datetime.now(timezone.utc).isoformat(),
@@ -68,7 +74,7 @@ def run_agent(
     max_iters = settings.max_tool_iterations
 
     for iteration in range(max_iters):
-        response = client.messages.create(
+        response = client.messages_create(
             model=model,
             max_tokens=4096,
             system=system,
@@ -76,11 +82,10 @@ def run_agent(
             messages=messages,
         )
 
-        assistant_content = response.content
-        messages.append({"role": "assistant", "content": assistant_content})
+        messages.append(response.to_message_dict())
 
-        tool_uses = [b for b in assistant_content if getattr(b, "type", None) == "tool_use"]
-        text_blocks = [b.text for b in assistant_content if getattr(b, "type", None) == "text"]
+        tool_uses = [b for b in response.content if isinstance(b, ToolUseBlock)]
+        text_blocks = [b.text for b in response.content if isinstance(b, TextBlock)]
 
         step: dict[str, Any] = {
             "iteration": iteration + 1,
@@ -102,7 +107,6 @@ def run_agent(
             try:
                 raw_result = handler(**args)
             except TypeError:
-                # Fallback: pass whole dict if signature mismatch
                 raw_result = handler(**{k: v for k, v in args.items()})
             except Exception as exc:  # noqa: BLE001
                 raw_result = json.dumps({"error": str(exc)})
@@ -127,16 +131,14 @@ def run_agent(
         trace["steps"].append(step)
         messages.append({"role": "user", "content": tool_results})
     else:
-        # Hit iteration cap — ask for final synthesis without more tools
-        response = client.messages.create(
+        response = client.messages_create(
             model=model,
             max_tokens=4096,
             system=system
             + "\n\nYou have reached the tool-call limit. Produce the final answer now using prior tool results. Do not call tools.",
             messages=messages,
         )
-        text_blocks = [b.text for b in response.content if getattr(b, "type", None) == "text"]
-        final_text = "\n".join(text_blocks).strip()
+        final_text = response.text().strip()
         trace["steps"].append(
             {
                 "iteration": max_iters + 1,

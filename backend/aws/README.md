@@ -1,8 +1,8 @@
 # Bedrock Anthropic Lambda (CDK)
 
 Streams Anthropic Claude from **Amazon Bedrock** through a **Lambda Function URL**
-with `RESPONSE_STREAM`. The Python agent still uses the Anthropic SDK + API key;
-this stack is ready to wire later.
+with `RESPONSE_STREAM`. The Python app posts Anthropic-shaped requests to this URL
+(`BEDROCK_LAMBDA_URL` in `.env`).
 
 ## Layout
 
@@ -45,7 +45,11 @@ Optional model override:
 npx cdk deploy -c modelId=us.anthropic.claude-sonnet-4-20250514-v1:0
 ```
 
-Copy the stack output `BedrockAnthropicFunctionUrl`.
+Copy the stack output `BedrockAnthropicFunctionUrl` into project `.env`:
+
+```bash
+BEDROCK_LAMBDA_URL=https://xxxx.lambda-url.us-east-1.on.aws/
+```
 
 ## Call the Function URL (stream)
 
@@ -63,6 +67,9 @@ Body shape is Anthropic Messages–compatible (`messages`, optional `system`, `t
 
 Streaming events are SSE lines (`data: {...}`) plus a final `data: [DONE]`.
 
+App client: `backend/app/llm/bedrock_lambda.py` (consumes the stream, rebuilds
+full messages including `tool_use` for the agent loop).
+
 ## IAM granted to the Lambda
 
 - `bedrock:InvokeModel`
@@ -76,8 +83,3 @@ Resources: Anthropic foundation models + account inference profiles.
 
 Function URL auth is currently `NONE` so you can test streaming without SigV4.
 Tighten to `AWS_IAM` before any public/prod use.
-
-## Do not change yet
-
-App code under `backend/app/` still uses `ANTHROPIC_API_KEY` via the Anthropic
-Python SDK. Point it at this URL in a later change.

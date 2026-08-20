@@ -2,13 +2,14 @@
 
 Composable procurement agents + eval harness, inspired by Zip's engineering posts
 ("the instructions are not the point" / "vibes don't ship"). Portfolio demo with
-**real** Claude tool-use, Moorcheh retrieval, SQLite persistence, and GraphQL/React UI.
+**real** Claude tool-use (via Bedrock Lambda), Moorcheh retrieval, SQLite
+persistence, and GraphQL/React UI.
 
 ## What's synthetic vs real
 
 | Synthetic (mocked content only) | Real code paths |
 |---|---|
-| Vendor/contract seed rows | Claude native tool-use orchestration |
+| Vendor/contract seed rows | Claude tool-use via Bedrock Lambda Function URL |
 | Markdown MSA/DPA/NDA templates under `backend/data/documents/` | Moorcheh semantic search via `RetrievalBackend` |
 | | SQLAlchemy queries via `api_data` |
 | | Full traces in `agent_runs` |
@@ -17,7 +18,7 @@ Composable procurement agents + eval harness, inspired by Zip's engineering post
 ## Architecture
 
 - **Recipes** (`backend/recipes/*.json`) configure agents — the engine never branches on recipe name.
-- **Engine** — preprocess → Claude tool loop (max 3) → synthesis → persist trace.
+- **Engine** — Claude tool loop (max 3) through Bedrock Lambda → synthesis → persist trace.
 - **Tools** — `document_retrieval` (Moorcheh), `api_data` (read-only SQL).
 - **Eval** — `golden_set` → run recipe → score → `eval_scores`; `correct.py` closes the loop.
 
@@ -30,15 +31,15 @@ Composable procurement agents + eval harness, inspired by Zip's engineering post
 
 - Python 3.11+
 - Node 20+
-- Anthropic API key
-- Moorcheh on-prem running at `http://localhost:8080` (you start it; app only calls the API)
+- Deployed Bedrock Anthropic Lambda Function URL (see `backend/aws`)
+- Moorcheh on-prem at `http://localhost:8080` (you start it; app only calls the API)
 
 ## Setup
 
 ```bash
 # 1. Env
 cp .env.example .env
-# edit ANTHROPIC_API_KEY
+# set BEDROCK_LAMBDA_URL from: cd backend/aws && npx cdk deploy
 
 # 2. Backend
 cd backend
@@ -87,14 +88,8 @@ cd backend
 pytest -q
 ```
 
-## Note on judge model
+## LLM path (Bedrock Lambda)
 
-Agent uses Sonnet; judge uses Haiku (cost). Ideally the judge would be a different model family to reduce self-preference bias — called out intentionally.
-
-## AWS Bedrock Lambda (optional, not wired yet)
-
-Streaming Anthropic-on-Bedrock via Lambda Function URL lives under
-[`backend/aws`](backend/aws). The app still uses `ANTHROPIC_API_KEY` directly;
-deploy the CDK stack when you want the Function URL ready to swap in later.
-See [`backend/aws/README.md`](backend/aws/README.md).
-
+The app calls Claude through your Lambda Function URL (`BEDROCK_LAMBDA_URL`), which
+streams from Amazon Bedrock. CDK stack: [`backend/aws`](backend/aws).
+No Anthropic API key is required for the agent/judge path.

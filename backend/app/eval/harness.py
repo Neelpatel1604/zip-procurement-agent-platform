@@ -4,12 +4,12 @@ import json
 import re
 from typing import Any
 
-import anthropic
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db.models import AgentRun, EvalScore, GoldenSet
 from app.engine.runner import run_agent
+from app.llm import get_llm_client
 
 
 def _extract_recommendation(text: str) -> str | None:
@@ -19,7 +19,6 @@ def _extract_recommendation(text: str) -> str | None:
             return label
         if re.search(rf"\"recommendation\"\s*:\s*\"{label}\"", lowered):
             return label
-    # fallback: last occurrence of a known label as standalone decision
     matches = re.findall(r"\b(block|merge_review|allow)\b", lowered)
     return matches[-1] if matches else None
 
@@ -44,7 +43,7 @@ def judge_with_claude(
     trace_json: str,
 ) -> tuple[float, str, dict[str, Any]]:
     settings = get_settings()
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    client = get_llm_client()
     prompt = f"""You are an evaluation judge for a procurement AI agent.
 
 Score the agent run against the rubric. Use the FULL execution trace, not only the final answer.
@@ -74,12 +73,12 @@ Respond with ONLY valid JSON:
   }}
 }}
 """
-    response = client.messages.create(
-        model=settings.anthropic_judge_model,
+    response = client.messages_create(
+        model=settings.bedrock_judge_model or settings.bedrock_model_id or None,
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )
-    text = "".join(b.text for b in response.content if getattr(b, "type", None) == "text")
+    text = response.text()
     parsed = _parse_json_object(text)
     score = float(parsed.get("score", 0))
     score = max(0.0, min(1.0, score))
@@ -142,7 +141,6 @@ def correct_run(
         or "Corrected golden case derived from a human-reviewed failure. "
         "Prefer the corrected expected answer when present; otherwise grade grounding and policy adherence."
     )
-    # For duplicate cases, try to extract recommendation as expected_answer
     expected = _extract_recommendation(corrected_output)
     item = GoldenSet(
         recipe_id=run.recipe_id,
