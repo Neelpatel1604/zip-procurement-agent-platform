@@ -21,7 +21,7 @@ export function LiveProgress({ running, status, recipeName, log }: Props) {
           className="mt-0.5 h-8 w-8 shrink-0 rounded-full"
           style={{
             background:
-              'linear-gradient(180deg, #b8c7e8 0%, #e8c4b0 100%)',
+              'linear-gradient(180deg, #c5d4f5 0%, #7b93d4 100%)',
           }}
           aria-hidden
         />
