@@ -90,3 +90,18 @@ export const DELETE_AGENT_RUN_MUTATION = gql`
     deleteAgentRun(id: $id)
   }
 `
+
+export const RUN_EVALS_MUTATION = gql`
+  mutation RunEvals($recipeId: String) {
+    runEvals(recipeId: $recipeId) {
+      id
+      goldenSetId
+      runId
+      score
+      reasoning
+      metricBreakdown
+      createdAt
+      recipeId
+    }
+  }
+`

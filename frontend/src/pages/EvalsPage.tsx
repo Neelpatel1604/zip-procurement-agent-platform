@@ -1,15 +1,18 @@
-import { useMemo } from 'react'
-import { useQuery } from '@apollo/client/react'
-import { EVAL_SCORES_QUERY } from '../graphql'
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery } from '@apollo/client/react'
+import { EVAL_SCORES_QUERY, RUN_EVALS_MUTATION } from '../graphql'
 import type { EvalScore } from '../types'
 
 type Data = { evalScores: EvalScore[] }
 
 export function EvalsPage() {
-  const { data, loading, error } = useQuery<Data>(EVAL_SCORES_QUERY, {
+  const { data, loading, error, refetch } = useQuery<Data>(EVAL_SCORES_QUERY, {
     variables: { limit: 50 },
     fetchPolicy: 'network-only',
   })
+  const [runEvals, { loading: running }] = useMutation(RUN_EVALS_MUTATION)
+  const [status, setStatus] = useState<string | null>(null)
+  const [runError, setRunError] = useState<string | null>(null)
 
   const scores = data?.evalScores ?? []
 
@@ -23,21 +26,59 @@ export function EvalsPage() {
     return [...map.entries()]
   }, [scores])
 
-  if (loading) return <p className="text-sm text-[var(--muted)]">Loading eval scores…</p>
+  async function onRunEvals() {
+    setRunError(null)
+    setStatus('Running eval suite… this can take a few minutes (Bedrock calls per golden case).')
+    try {
+      const res = await runEvals({ variables: { recipeId: null } })
+      const written = (res.data as { runEvals?: EvalScore[] })?.runEvals ?? []
+      setStatus(`Wrote ${written.length} eval score(s).`)
+      await refetch()
+    } catch (err) {
+      setRunError(err instanceof Error ? err.message : String(err))
+      setStatus(null)
+    }
+  }
+
+  if (loading && !running) {
+    return <p className="text-sm text-[var(--muted)]">Loading eval scores…</p>
+  }
   if (error) return <p className="text-sm text-red-700">{error.message}</p>
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Eval dashboard</h1>
-        <p className="text-sm text-[var(--muted)]">
-          Scores from <code>run_evals.py</code> — deterministic checks + Claude-as-judge.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Eval dashboard</h1>
+          <p className="text-sm text-[var(--muted)]">
+            Deterministic checks + Claude-as-judge over the golden set.
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={running}
+          onClick={onRunEvals}
+          className="cursor-pointer rounded-lg bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {running ? 'Running evals…' : 'Run evals'}
+        </button>
       </header>
+
+      {status && (
+        <p className="rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--muted)]">
+          {status}
+        </p>
+      )}
+      {runError && (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {runError}
+        </p>
+      )}
 
       {scores.length === 0 ? (
         <p className="text-sm text-[var(--muted)]">
-          No eval_scores yet. From backend: <code>python scripts/run_evals.py</code>
+          No eval_scores yet. Click <strong>Run evals</strong> (or use{' '}
+          <code>python scripts/run_evals.py</code>).
         </p>
       ) : (
         <>

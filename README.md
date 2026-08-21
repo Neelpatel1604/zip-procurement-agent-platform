@@ -20,7 +20,7 @@ persistence, and GraphQL/React UI.
 - **Recipes** (`backend/recipes/*.json`) configure agents — the engine never branches on recipe name.
 - **Engine** — Claude tool loop (max 3) through Bedrock Lambda → synthesis → persist trace.
 - **Tools** — `document_retrieval` (Moorcheh), `api_data` (read-only SQL).
-- **Eval** — `golden_set` → run recipe → score → `eval_scores`; `correct.py` closes the loop.
+- **Eval** — `golden_set` → run recipe → score → `eval_scores`; correction closes the loop.
 
 ### Recipes
 

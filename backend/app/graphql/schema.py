@@ -9,7 +9,7 @@ import strawberry
 from app.db.models import AgentRun, EvalScore
 from app.db.session import SessionLocal
 from app.engine import list_recipes, run_agent
-from app.eval import correct_run
+from app.eval import correct_run, run_all_evals
 
 
 @strawberry.type
@@ -236,6 +236,36 @@ class Mutation:
             session.delete(run)
             session.commit()
             return True
+        finally:
+            session.close()
+
+    @strawberry.mutation
+    def run_evals(self, recipe_id: Optional[str] = None) -> list[EvalScoreType]:
+        """Run the eval harness over golden_set (optionally filtered by recipe)."""
+        session = SessionLocal()
+        try:
+            scores = run_all_evals(session, recipe_id=recipe_id)
+            out: list[EvalScoreType] = []
+            for score in scores:
+                run = session.get(AgentRun, score.run_id)
+                created = score.created_at
+                if created is not None and created.tzinfo is None:
+                    from datetime import timezone
+
+                    created = created.replace(tzinfo=timezone.utc)
+                out.append(
+                    EvalScoreType(
+                        id=score.id,
+                        golden_set_id=score.golden_set_id,
+                        run_id=score.run_id,
+                        score=score.score,
+                        reasoning=score.reasoning,
+                        metric_breakdown=score.metric_breakdown,
+                        created_at=created,
+                        recipe_id=run.recipe_id if run else recipe_id,
+                    )
+                )
+            return out
         finally:
             session.close()
 
