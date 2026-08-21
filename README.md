@@ -2,18 +2,8 @@
 
 Composable procurement agents + eval harness, inspired by Zip's engineering posts
 ("the instructions are not the point" / "vibes don't ship"). Portfolio demo with
-**real** Claude tool-use (via Bedrock Lambda), Moorcheh retrieval, SQLite
-persistence, and GraphQL/React UI.
-
-## What's synthetic vs real
-
-| Synthetic (mocked content only) | Real code paths |
-|---|---|
-| Vendor/contract seed rows | Claude tool-use via Bedrock Lambda Function URL |
-| Markdown MSA/DPA/NDA templates under `backend/data/documents/` | Moorcheh semantic search via `RetrievalBackend` |
-| | SQLAlchemy queries via `api_data` |
-| | Full traces in `agent_runs` |
-| | Deterministic + LLM-as-judge evals + correction → `golden_set` |
+Claude tool-use via Bedrock Lambda, Moorcheh retrieval, SQLite persistence, and
+a GraphQL/React UI.
 
 ## Architecture
 
@@ -78,7 +68,7 @@ python scripts/correct.py --run-id 1 --corrected-output '{"recommendation":"bloc
 1. Show two recipe JSON files — same engine fields, different prompts/tools.
 2. Run Duplicate Vendor Check in the UI; expand the tool-call trace.
 3. Run MSA Risk Review; show retrieval hits grounding the risks.
-4. Run `python scripts/run_evals.py`; refresh Evals page for real scores.
+4. Run evals (UI button or `python scripts/run_evals.py`); refresh the Evals page.
 5. Correct a run in the UI (or CLI); re-run evals and show the new golden row scoring.
 
 ## Tests

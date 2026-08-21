@@ -1,5 +1,4 @@
-# SYNTHETIC DOCUMENT — for demo/portfolio use only.
-# Not a real legal agreement. Modeled after common public MSA patterns.
+# Demo sample document — not a legal agreement. Modeled after common public MSA patterns.
 
 # Master Service Agreement — CloudSync Analytics Inc.
 # Document ID: msa-cloudsync-risky

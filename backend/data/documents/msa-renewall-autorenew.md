@@ -1,5 +1,4 @@
-# SYNTHETIC DOCUMENT — for demo/portfolio use only.
-# Not a real legal agreement.
+# Demo sample document — not a legal agreement.
 
 # Master Service Agreement — RenewAll SaaS (Auto-Renewal Heavy)
 # Document ID: msa-renewall-autorenew

@@ -1,5 +1,4 @@
-# SYNTHETIC DOCUMENT — for demo/portfolio use only.
-# Not a real legal agreement.
+# Demo sample document — not a legal agreement.
 
 # Master Service Agreement — Acme Corp Services
 # Document ID: msa-acme-standard

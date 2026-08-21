@@ -1,5 +1,4 @@
-# SYNTHETIC DOCUMENT — for demo/portfolio use only.
-# Not a real legal agreement.
+# Demo sample document — not a legal agreement.
 
 # Data Processing Addendum — DataPipe Systems
 # Document ID: dpa-datapipe-weak
