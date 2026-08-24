@@ -1,9 +1,11 @@
 # Procurement Agent Platform
 
-Composable procurement agents + eval harness, inspired by Zip's engineering posts
-("the instructions are not the point" / "vibes don't ship"). Portfolio demo with
-Claude tool-use via Bedrock Lambda, Moorcheh retrieval, SQLite persistence, and
-a GraphQL/React UI.
+Composable procurement agents + eval harness, inspired by Zip's engineering posts:
+
+- [The instructions are not the point](https://zip.com/engineering-blog/custom-agents-composable-ai-platform) — composable agents via recipe configs on one shared engine
+- [Vibes Don't Ship: How We Evaluate Our AI Agents](https://zip.com/engineering-blog/vibes-dont-ship-how-we-evaluate-our-ai-agents) — deterministic checks, LLM-as-judge, and a correction loop into the golden set
+
+Portfolio demo with Claude tool-use via Bedrock Lambda, Moorcheh retrieval, SQLite persistence, and a GraphQL/React UI.
 
 ## Architecture
 
