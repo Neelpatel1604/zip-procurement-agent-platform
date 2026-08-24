@@ -2,8 +2,8 @@
 
 Composable procurement agents + eval harness, inspired by Zip's engineering posts:
 
-- [The instructions are not the point](https://zip.com/engineering-blog/custom-agents-composable-ai-platform) — composable agents via recipe configs on one shared engine
-- [Vibes Don't Ship: How We Evaluate Our AI Agents](https://zip.com/engineering-blog/vibes-dont-ship-how-we-evaluate-our-ai-agents) — deterministic checks, LLM-as-judge, and a correction loop into the golden set
+- [The instructions are not the point](https://zip.com/engineering-blog/custom-agents-composable-ai-platform) - composable agents via recipe configs on one shared engine
+- [Vibes Don't Ship: How We Evaluate Our AI Agents](https://zip.com/engineering-blog/vibes-dont-ship-how-we-evaluate-our-ai-agents) - deterministic checks, LLM-as-judge, and a correction loop into the golden set
 
 Portfolio demo with Claude tool-use via Bedrock Lambda, Moorcheh retrieval, SQLite persistence, and a GraphQL/React UI.
 
@@ -23,15 +23,16 @@ Portfolio demo with Claude tool-use via Bedrock Lambda, Moorcheh retrieval, SQLi
 
 - Python 3.11+
 - Node 20+
-- Deployed Bedrock Anthropic Lambda Function URL (see `backend/aws`)
+- AWS Bedrock Lambda backend deployed (see [`backend/aws`](backend/aws))
 - Moorcheh on-prem at `http://localhost:8080` (you start it; app only calls the API)
 
 ## Setup
 
+Deploy the AWS backend first (`cdk bootstrap` then `cdk deploy` in `backend/aws`), then set `BEDROCK_LAMBDA_URL` in `.env`.
+
 ```bash
 # 1. Env
 cp .env.example .env
-# set BEDROCK_LAMBDA_URL from: cd backend/aws && npx cdk deploy
 
 # 2. Backend
 cd backend
