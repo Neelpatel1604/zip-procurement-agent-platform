@@ -9,9 +9,73 @@ Portfolio demo with Claude tool-use via Bedrock Lambda, Moorcheh retrieval, SQLi
 
 ## Architecture
 
+[View diagram on Figma](https://www.figma.com/board/rifVUyjwDfc8Vbhrw1f8PF/zip-procurement-agent-platform?node-id=0-1&t=YqSZlEguACNDzm0R-1)
+
+```mermaid
+flowchart TB
+  subgraph FE["Frontend"]
+    UI["React · Run / History / Evals"]
+  end
+
+  subgraph API["API — FastAPI"]
+    GQL["GraphQL · Strawberry"]
+    SSE["SSE · /api/runs/stream"]
+  end
+
+  subgraph ENG["Agent engine"]
+    REC["Recipe JSON · prompts · tools · output format"]
+    LOOP["ReAct loop · max 3 iterations"]
+  end
+
+  subgraph LLM["LLM path"]
+    LAM["Bedrock Lambda · Function URL"]
+    BR["Amazon Bedrock · Claude"]
+  end
+
+  subgraph TOOLS["Tools"]
+    SQL["api_data · read-only SQL"]
+    RET["document_retrieval · semantic search"]
+  end
+
+  subgraph DATA["Persistence"]
+    SQLITE[(SQLite)]
+    MOOR[(Moorcheh)]
+  end
+
+  subgraph SQLITE_DATA["What's in SQLite"]
+    SQ["Seeded: vendors, contracts, recipes, golden_set<br/>Runtime: agent_runs, eval_scores, corrections"]
+  end
+
+  subgraph MOOR_DATA["What's in Moorcheh"]
+    MH["Chunked MSA / DPA / NDA contract text"]
+  end
+
+  UI -->|history · evals · correct| GQL
+  UI -->|run + progress| SSE
+  GQL --> LOOP
+  SSE --> LOOP
+  LOOP --> REC
+  LOOP --> LAM --> BR
+  LOOP --> SQL
+  LOOP --> RET
+  SQL --> SQLITE
+  RET --> MOOR
+  SQLITE --- SQ
+  MOOR --- MH
+  LOOP -->|trace + output| SQLITE
+  GQL -->|runEvals · correctRun| SQLITE
+```
+
+| Layer | Stack | Role |
+|---|---|---|
+| Frontend | React, Apollo, Vite | Submit runs, stream progress, browse history, run evals |
+| API | FastAPI, Strawberry GraphQL, SSE | GraphQL for app data; SSE streams agent progress while executing |
+| Engine | Python recipe loader + ReAct loop | One engine for all agents — behavior comes from recipe JSON |
+| LLM | Bedrock Lambda → Claude | Tool-use orchestration and eval judge calls |
+| Tools | `api_data`, `document_retrieval` | SQL over vendors/contracts; semantic search over contract docs |
+| Data | SQLite, Moorcheh | Structured procurement data + ingested document chunks |
+
 - **Recipes** (`backend/recipes/*.json`) configure agents — the engine never branches on recipe name.
-- **Engine** — Claude tool loop (max 3) through Bedrock Lambda → synthesis → persist trace.
-- **Tools** — `document_retrieval` (Moorcheh), `api_data` (read-only SQL).
 - **Eval** — `golden_set` → run recipe → score → `eval_scores`; correction closes the loop.
 
 ### Recipes
