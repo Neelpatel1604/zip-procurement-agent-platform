@@ -17,7 +17,7 @@ flowchart TB
     UI["React · Run / History / Evals"]
   end
 
-  subgraph API["API — FastAPI"]
+  subgraph API["API - FastAPI"]
     GQL["GraphQL · Strawberry"]
     SSE["SSE · /api/runs/stream"]
   end
@@ -70,18 +70,18 @@ flowchart TB
 |---|---|---|
 | Frontend | React, Apollo, Vite | Submit runs, stream progress, browse history, run evals |
 | API | FastAPI, Strawberry GraphQL, SSE | GraphQL for app data; SSE streams agent progress while executing |
-| Engine | Python recipe loader + ReAct loop | One engine for all agents — behavior comes from recipe JSON |
+| Engine | Python recipe loader + ReAct loop | One engine for all agents - behavior comes from recipe JSON |
 | LLM | Bedrock Lambda → Claude | Tool-use orchestration and eval judge calls |
 | Tools | `api_data`, `document_retrieval` | SQL over vendors/contracts; semantic search over contract docs |
 | Data | SQLite, Moorcheh | Structured procurement data + ingested document chunks |
 
-- **Recipes** (`backend/recipes/*.json`) configure agents — the engine never branches on recipe name.
-- **Eval** — `golden_set` → run recipe → score → `eval_scores`; correction closes the loop.
+- **Recipes** (`backend/recipes/*.json`) configure agents - the engine never branches on recipe name.
+- **Eval** - `golden_set` → run recipe → score → `eval_scores`; correction closes the loop.
 
 ### Recipes
 
-1. `duplicate_vendor_check` — policy: same domain + similar name → `block`; similar name **or** shared domain → `merge_review`; else `allow`.
-2. `msa_risk_review` — retrieve contract text, flag liability / indemnity / renewal / privacy risks.
+1. `duplicate_vendor_check` - policy: same domain + similar name → `block`; similar name **or** shared domain → `merge_review`; else `allow`.
+2. `msa_risk_review` - retrieve contract text, flag liability / indemnity / renewal / privacy risks.
 
 ## Prerequisites
 
@@ -113,7 +113,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 — GraphQL playground at http://localhost:8000/graphql
+Open http://localhost:5173 - GraphQL playground at http://localhost:8000/graphql
 
 ## CLI demos
 
@@ -132,7 +132,7 @@ python scripts/correct.py --run-id 1 --corrected-output '{"recommendation":"bloc
 
 ## Demo walkthrough (5–7 min)
 
-1. Show two recipe JSON files — same engine fields, different prompts/tools.
+1. Show two recipe JSON files - same engine fields, different prompts/tools.
 2. Run Duplicate Vendor Check in the UI; expand the tool-call trace.
 3. Run MSA Risk Review; show retrieval hits grounding the risks.
 4. Run evals (UI button or `python scripts/run_evals.py`); refresh the Evals page.
