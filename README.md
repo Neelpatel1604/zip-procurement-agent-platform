@@ -7,6 +7,8 @@ Composable procurement agents + eval harness, inspired by Zip's engineering post
 
 Portfolio demo with Claude tool-use via Bedrock Lambda, Moorcheh retrieval, SQLite persistence, and a GraphQL/React UI.
 
+**[Demo walkthrough video](https://drive.google.com/file/d/1uD8GfW4CJ8gEbp9sY0jZOUcWeE0KKWe-/view?usp=sharing)**
+
 ## Architecture
 
 [View diagram on Figma](https://www.figma.com/board/rifVUyjwDfc8Vbhrw1f8PF/zip-procurement-agent-platform?node-id=0-1&t=YqSZlEguACNDzm0R-1)
@@ -130,7 +132,9 @@ python scripts/run_evals.py
 python scripts/correct.py --run-id 1 --corrected-output '{"recommendation":"block"}'
 ```
 
-## Demo walkthrough (5–7 min)
+## Demo walkthrough (5-7 min)
+
+[Watch the demo video](https://drive.google.com/file/d/1uD8GfW4CJ8gEbp9sY0jZOUcWeE0KKWe-/view?usp=sharing)
 
 1. Show two recipe JSON files - same engine fields, different prompts/tools.
 2. Run Duplicate Vendor Check in the UI; expand the tool-call trace.
